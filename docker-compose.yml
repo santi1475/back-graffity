@@ -24,6 +24,8 @@ services:
       - redis_data:/data
 
   api:
+    env_file:
+      - .env
     build:
       context: .
       dockerfile: Dockerfile

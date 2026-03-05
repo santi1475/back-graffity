@@ -1,0 +1,113 @@
+from django.db import models
+from django.contrib.auth.models import AbstractUser, Group
+from django.core.exceptions import ValidationError
+
+class BaseModel(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+
+    class Meta:
+        abstract = True
+
+
+class User(AbstractUser, BaseModel):
+    GENDER_MALE = 1
+    GENDER_FEMALE = 2
+    GENDER_CHOICES = [
+        (GENDER_MALE, 'Masculino'),
+        (GENDER_FEMALE, 'Femenino'),
+    ]
+
+    name = models.CharField(max_length=255)
+    surname = models.CharField(max_length=255, null=True, blank=True)
+    email = models.EmailField(unique=True)
+    role = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
+    phone = models.CharField(max_length=20, null=True, blank=True)
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
+    type_document = models.CharField(max_length=20, null=True, blank=True)
+    n_document = models.CharField(max_length=20, null=True, blank=True)
+    gender = models.PositiveSmallIntegerField(choices=GENDER_CHOICES, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.name} {self.surname or ''}".strip()
+
+
+class Company(BaseModel):
+    razon_social = models.CharField(max_length=255)
+    razon_social_comercial = models.CharField(max_length=255, null=True, blank=True)
+    phone = models.CharField(max_length=255, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
+    n_document = models.CharField(max_length=255, null=True, blank=True)  # RUC
+    birth_date = models.DateField(null=True, blank=True)
+    
+    ubigeo_region = models.CharField(max_length=255, null=True, blank=True)
+    ubigeo_provincia = models.CharField(max_length=255, null=True, blank=True)
+    ubigeo_distrito = models.CharField(max_length=255, null=True, blank=True)
+    
+    region = models.CharField(max_length=255, null=True, blank=True)
+    provincia = models.CharField(max_length=255, null=True, blank=True)
+    distrito = models.CharField(max_length=255, null=True, blank=True)
+    
+    address = models.TextField(null=True, blank=True)
+    urbanizacion = models.CharField(max_length=255, null=True, blank=True)
+    cod_local = models.CharField(max_length=255, null=True, blank=True)
+
+    def clean(self):
+        # Aseguramos el patrón Singleton (sólo un registro de esta tabla)
+        if self._state.adding and Company.objects.exists():
+            raise ValidationError("Solo puede existir un registro de la pestaña Company (Singleton).")
+        super().clean()
+
+    def __str__(self):
+        return self.razon_social
+
+
+class Category(BaseModel):
+    title = models.CharField(max_length=255)
+    imagen = models.ImageField(upload_to='categories/', null=True, blank=True)
+    icon_name = models.CharField(max_length=255, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.title
+
+
+class Brand(BaseModel):
+    name = models.CharField(max_length=150, unique=True)
+    image = models.ImageField(upload_to='brands/', null=True, blank=True)
+    icon_name = models.CharField(max_length=255, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Product(BaseModel):
+    title = models.CharField(max_length=255)
+    sku = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    barcode = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    imagen = models.ImageField(upload_to='products/', null=True, blank=True)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
+    brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
+    description = models.TextField(null=True, blank=True)
+    disponibilidad = models.IntegerField(default=1)
+    state_stock = models.BooleanField(default=True)
+    unidad_medida = models.CharField(max_length=255, null=True, blank=True)
+    stock = models.IntegerField(default=0)
+    
+    price_general = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    price_company = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    max_discount = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    
+    is_discount = models.BooleanField(default=False)
+    include_igv = models.BooleanField(default=True)
+    is_icbper = models.BooleanField(default=False)
+    is_ivap = models.BooleanField(default=False)
+    
+    percentage_isc = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    is_especial_nota = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.title
