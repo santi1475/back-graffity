@@ -37,10 +37,6 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DB_HOST=db
-      - DB_NAME=graffity_pos
-      - DB_USER=admin
-      - DB_PASSWORD=1475
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - db

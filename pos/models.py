@@ -1,6 +1,7 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser, Group
+from django.contrib.auth.models import AbstractUser, BaseUserManager, Group
 from django.core.exceptions import ValidationError
+
 
 class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -11,7 +12,27 @@ class BaseModel(models.Model):
         abstract = True
 
 
+class UserManager(BaseUserManager):
+    """Manager personalizado para User con email como identificador único."""
+
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError("El email es obligatorio.")
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(email, password, **extra_fields)
+
+
 class User(AbstractUser, BaseModel):
+    username = None  # Elimina el campo heredado de AbstractUser
+
     GENDER_MALE = 1
     GENDER_FEMALE = 2
     GENDER_CHOICES = [
@@ -29,6 +50,11 @@ class User(AbstractUser, BaseModel):
     n_document = models.CharField(max_length=20, null=True, blank=True)
     gender = models.PositiveSmallIntegerField(choices=GENDER_CHOICES, null=True, blank=True)
     is_active = models.BooleanField(default=True)
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['name']
+
+    objects = UserManager()
 
     def __str__(self):
         return f"{self.name} {self.surname or ''}".strip()
