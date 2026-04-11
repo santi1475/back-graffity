@@ -1,6 +1,8 @@
+import os
 from django.contrib.auth import authenticate
 from django.core.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.core.files.storage import default_storage
 
 from django.conf import settings
 
@@ -55,3 +57,13 @@ def auth_login(*, email: str, password: str) -> dict:
             "role": role_data,
         },
     }
+
+def delete_brand_image(brand):
+    if brand.image and hasattr(brand.image, 'path'):
+        if os.path.exists(brand.image.path):
+            os.remove(brand.image.path)
+            
+def delete_category_image(category):
+    if category.image and hasattr(category.image, 'path'):
+        if os.path.exists(category.image.path):
+            os.remove(category.image.path)

@@ -6,7 +6,7 @@ from django.contrib.auth.models import Group, Permission
 class PermissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Permission
-        fields = ['id', 'name', 'codename'] # codename es el equivalente real al 'name' de Spatie
+        fields = ['id', 'name', 'codename'] 
 
 class RoleSerializer(serializers.ModelSerializer):
     permissions = PermissionSerializer(many=True, read_only=True)
@@ -47,4 +47,33 @@ class UserSerializer(serializers.ModelSerializer):
     def get_avatar(self, obj):
         if obj.avatar:
             return f"{settings.MEDIA_URL}{obj.avatar}"
+        return None
+
+class BrandSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Brand
+        fields = ['id', 'name', 'image', 'icon_name', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'image', 'created_at', 'updated_at']
+
+    def get_image(self, obj):
+        if obj.image:
+            return f"{settings.MEDIA_URL}{obj.image}"
+        return None
+    
+class CategorySerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = [
+            'id', 'title', 'image', 
+            'icon_name', 'is_active', 'created_at'
+        ]
+        read_only_fields = ['id', 'image', 'created_at']
+
+    def get_image(self, obj):
+        if obj.imagen:
+            return f"{settings.MEDIA_URL}{obj.imagen}"
         return None

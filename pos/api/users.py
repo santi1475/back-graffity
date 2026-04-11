@@ -13,7 +13,6 @@ class UserApi(APIView):
     def get(self, request, pk=None):
         if pk:
             try:
-                # Filtramos por tu campo is_deleted del BaseModel
                 user = User.objects.get(pk=pk, is_deleted=False)
                 return Response(UserSerializer(user).data)
             except User.DoesNotExist:
@@ -93,7 +92,6 @@ class UserApi(APIView):
         if User.objects.filter(email=email).exclude(pk=pk).exists():
             return Response({"code": 405, "message": "El correo ya existe"})
 
-        # Actualización de campos según tu modelo
         if "name" in request.data: user.name = request.data.get("name")
         if "surname" in request.data: user.surname = request.data.get("surname")
         

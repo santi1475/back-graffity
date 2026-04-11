@@ -6,10 +6,9 @@ from django.core.paginator import Paginator
 from pos.serializers import RoleSerializer
 
 class RoleApi(APIView):
-    permission_classes = [IsAuthenticated] # Protege la ruta
+    permission_classes = [IsAuthenticated] 
 
     def get(self, request, pk=None):
-        # Si envían un ID, devolvemos uno (Show)
         if pk:
             try:
                 role = Group.objects.get(pk=pk)
@@ -17,11 +16,9 @@ class RoleApi(APIView):
             except Group.DoesNotExist:
                 return Response({"message": "Rol no encontrado", "code": 404}, status=404)
 
-        # INDEX: Paginación y búsqueda
         search = request.GET.get('search', '')
         page_number = request.GET.get('page', 1)
         
-        # Filtramos como en Laravel: where("name", "like", "%$search%")
         roles_query = Group.objects.filter(name__icontains=search).order_by('-id')
         
         paginator = Paginator(roles_query, 5) # paginate(5)
@@ -46,9 +43,7 @@ class RoleApi(APIView):
 
         role = Group.objects.create(name=name)
         
-        # Asignar permisos: Equivale a givePermissionTo()
         if permissions_list:
-            # Asumiendo que el front envía IDs de permisos
             role.permissions.set(permissions_list) 
 
         return Response({
@@ -67,7 +62,6 @@ class RoleApi(APIView):
         name = request.data.get('name')
         permissions_list = request.data.get('permissions', [])
 
-        # Validar si existe otro rol con ese nombre (excepto él mismo)
         if Group.objects.filter(name=name).exclude(pk=pk).exists():
             return Response({
                 "code": 405,
@@ -77,7 +71,6 @@ class RoleApi(APIView):
         role.name = name
         role.save()
 
-        # Sincronizar permisos: Django .set() elimina los viejos y pone los nuevos (Igual a syncPermissions)
         role.permissions.set(permissions_list)
 
         return Response({
