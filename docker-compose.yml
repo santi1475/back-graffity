@@ -1,3 +1,4 @@
+# docker-compose.yml
 version: '3.8'
 
 services:
@@ -31,13 +32,15 @@ services:
       dockerfile: Dockerfile
     container_name: graffity_pos_api
     restart: always
-    command: python manage.py runserver 0.0.0.0:8000
+    # Cambiar el comando para usar el servidor ASGI de desarrollo
+    command: python manage.py runserver 0.0.0.0:8000  # ← Este comando SÍ funciona con ASGI
     volumes:
       - .:/app
     ports:
       - "8000:8000"
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=config.settings
     depends_on:
       - db
       - redis

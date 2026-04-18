@@ -77,3 +77,11 @@ class CategorySerializer(serializers.ModelSerializer):
         if obj.imagen:
             return f"{settings.MEDIA_URL}{obj.imagen}"
         return None
+    
+class ProductSerializer(serializers.ModelSerializer):
+    category = CategorySerializer(read_only=True)
+    brand = BrandSerializer(read_only=True)
+    
+    class Meta:
+        model = Product
+        exclude = ['is_deleted', 'updated_at']

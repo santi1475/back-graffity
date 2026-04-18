@@ -1,5 +1,7 @@
-from django.urls import path
+from django.urls import path, re_path
 from pos.api import LoginApi, RoleApi, PermissionApi, UserApi, BrandApi, CategoryApi
+from pos.api.products import ProductApi, ProductDetailApi, ProductConfigApi, ProductScanApi
+from .import consumers
 
 urlpatterns = [
     # ── Auth ──────────────────────────────────────────────
@@ -19,4 +21,15 @@ urlpatterns = [
     # ── Catalog: Categories ──────────────────────────────
     path('catalog/categories', CategoryApi.as_view(), name='category-list'),
     path('catalog/categories/<int:pk>', CategoryApi.as_view(), name='category-detail'),
+    
+    # --- Products ---
+    path('products/config', ProductConfigApi.as_view(), name='product-config'),
+    path('products/scan', ProductScanApi.as_view(), name='product-scan'),
+    path('products', ProductApi.as_view(), name='product-list'),
+    path('products/<int:pk>', ProductDetailApi.as_view(), name='product-detail'),
+]
+
+# WebSocket URL 
+websocket_urlpatterns = [
+    re_path(r'ws/scan/(?P<channel_uuid>[0-9a-f-]+)/$', consumers.ScanConsumer.as_asgi()),
 ]

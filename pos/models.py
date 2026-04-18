@@ -111,29 +111,37 @@ class Brand(BaseModel):
 
 
 class Product(BaseModel):
-    title = models.CharField(max_length=255)
-    sku = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    title = models.CharField(max_length=255, unique=True)
+    sku = models.CharField(max_length=100, unique=True, null=True, blank=True)
     barcode = models.CharField(max_length=50, unique=True, null=True, blank=True)
-    imagen = models.ImageField(upload_to='products/', null=True, blank=True)
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
-    brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
-    description = models.TextField(null=True, blank=True)
-    disponibilidad = models.IntegerField(default=1)
-    state_stock = models.BooleanField(default=True)
-    unidad_medida = models.CharField(max_length=255, null=True, blank=True)
-    stock = models.IntegerField(default=0)
+    image = models.ImageField(upload_to='products/', null=True, blank=True)
+    
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='products')
+    brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, related_name='products')
     
     price_general = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     price_company = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    max_discount = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    description = models.TextField(null=True, blank=True)
     
     is_discount = models.BooleanField(default=False)
+    max_discount = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    disponiblidad = models.IntegerField(default=1)
+    
+    state = models.SmallIntegerField(default=1)
+    state_stock = models.SmallIntegerField(default=1)
+    unidad_medida = models.CharField(max_length=50, null=True, blank=True)
+    stock = models.IntegerField(default=0)
+    
     include_igv = models.BooleanField(default=True)
     is_icbper = models.BooleanField(default=False)
     is_ivap = models.BooleanField(default=False)
-    
     percentage_isc = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     is_especial_nota = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['sku', 'barcode']),
+        ]
 
     def __str__(self):
         return self.title
