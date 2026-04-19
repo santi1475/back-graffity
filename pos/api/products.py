@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from pos.models import Product, Category, Brand
 from pos.serializers import ProductSerializer
 from pos.selectors import product_list
-from pos.services import product_register, product_soft_delete, process_product_scan
+from pos.services import product_register, product_update, product_soft_delete, process_product_scan
 
 class ProductApi(APIView):
     def get(self, request):
@@ -44,6 +44,25 @@ class ProductApi(APIView):
             return Response({"code": 405, "message": str(e.message)}, status=status.HTTP_400_BAD_REQUEST)
 
 class ProductDetailApi(APIView):
+    def put(self, request, pk):
+        product = Product.objects.filter(pk=pk, is_deleted=False).first()
+        if not product:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+            
+        try:
+            product = product_update(product=product, data=request.data)
+            serializer = ProductSerializer(product)
+            return Response({
+                "code": 200,
+                "message": "Producto actualizado exitosamente.",
+                "product": serializer.data
+            }, status=status.HTTP_200_OK)
+        except ValidationError as e:
+            return Response({"code": 405, "message": str(e.message)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        return self.put(request, pk)
+
     def delete(self, request, pk):
         product = Product.objects.filter(pk=pk, is_deleted=False).first()
         if not product:
@@ -57,8 +76,8 @@ class ProductDetailApi(APIView):
 
 class ProductConfigApi(APIView):
     def get(self, request):
-        categories = Category.objects.filter(is_deleted=False, state=1).values('id', 'title')
-        brands = Brand.objects.filter(is_deleted=False, state=1).values('id', 'name')
+        categories = Category.objects.filter(is_deleted=False, is_active=True).values('id', 'title')
+        brands = Brand.objects.filter(is_deleted=False, is_active=True).values('id', 'name')
         latest_product = Product.objects.order_by('-id').first()
         next_id = (latest_product.id + 1) if latest_product else 1
         

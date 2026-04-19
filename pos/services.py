@@ -70,31 +70,68 @@ def delete_category_image(category):
         if os.path.exists(category.image.path):
             os.remove(category.image.path)
             
-def _generate_sku(category: Category, brand: Brand) -> str:
-    brand_prefix = brand.name[:3].upper() if brand else 'GEN'
-    category_prefix = category.title[:3].upper() if category else 'VAR'
+def _generate_sku(category: Category, brand: Brand, title: str, product_id: int) -> str:
+    brand_prefix = brand.name[:3].upper() if brand and brand.name else 'GEN'
+    category_prefix = category.title[:3].upper() if category and category.title else 'VAR'
+    title_prefix = title.replace(" ", "")[:4].upper() if title else 'PROD'
     
-    category_count = Product.objects.filter(category=category, is_deleted=False).count()
-    next_number = category_count + 1
-    correlative = str(next_number).zfill(5)
-    
-    return f"{brand_prefix}-{category_prefix}-{correlative}"
+    return f"{brand_prefix}-{title_prefix}-{product_id}-{category_prefix}"
 
 def product_create(*, data: dict) -> Product:
-    sku = data.get('sku')
-    category_id = data.get('category_id')
-    brand_id = data.get('brand_id')
+    # Sanitizar data: Extraer el primer elemento si los valores llegan como listas
+    # Esto ocurre a menudo cuando se recibe 'multipart/form-data'
+    sanitized_data = {}
+    
+    # Manejar caso de QueryDict de Django/DRF
+    raw_data = data.dict() if hasattr(data, 'dict') else data
+    
+    for key, value in raw_data.items():
+        if isinstance(value, list) and len(value) > 0:
+            sanitized_data[key] = value[0]
+        else:
+            sanitized_data[key] = value
 
-    if not sku:
-        category = Category.objects.filter(id=category_id).first() if category_id else None
-        brand = Brand.objects.filter(id=brand_id).first() if brand_id else None
-        sku = _generate_sku(category, brand)
-        data['sku'] = sku
+    sku = sanitized_data.get('sku')
+    
+    # Limpiar y castear IDs explícitamente para evitar problemas relacionales
+    category_id = sanitized_data.get('category_id')
+    brand_id = sanitized_data.get('brand_id')
 
-    if Product.objects.filter(sku=sku, is_deleted=False).exists():
-        raise ValidationError("El SKU del producto ya existe.")
+    # Convertir a entero si es string o evitar fallo si llega None / vacío
+    if category_id and str(category_id).isdigit():
+        category_id = int(category_id)
+    else:
+        category_id = None
         
-    product = Product.objects.create(**data)
+    if brand_id and str(brand_id).isdigit():
+        brand_id = int(brand_id)
+    else:
+        brand_id = None
+
+    # Remover campos que no deben insertarse en la creación o podrían causar conflictos
+    sanitized_data.pop('id', None)
+    sanitized_data.pop('sku', None) # Se autogenerará siempre según nueva regla
+    
+    # Asignar los IDs casteados a la data limpia
+    if 'category_id' in sanitized_data:
+        sanitized_data['category_id'] = category_id
+    if 'brand_id' in sanitized_data:
+        sanitized_data['brand_id'] = brand_id
+        
+    product = Product.objects.create(**sanitized_data)
+    
+    # Generar SKU basado en reglas (utiliza el ID de PostgreSQL ya asignado)
+    category = Category.objects.filter(id=category_id).first() if category_id else None
+    brand = Brand.objects.filter(id=brand_id).first() if brand_id else None
+    sku_generado = _generate_sku(category, brand, product.title, product.id)
+    
+    # Asegurar unicidad (aunque la regla incluye ID que suele ser único, por si acaso)
+    if Product.objects.filter(sku=sku_generado).exclude(id=product.id).exists():
+        raise ValidationError("El SKU autogenerado del producto ya existe (colisión).")
+        
+    product.sku = sku_generado
+    product.save(update_fields=['sku'])
+    
     return product
 def product_register(*, data: dict) -> Product:
     """Create a new product via API.
@@ -103,8 +140,62 @@ def product_register(*, data: dict) -> Product:
     # Reuse existing product_create logic which handles SKU generation and validation
     return product_create(data=data)
 
+def product_update(*, product: Product, data: dict) -> Product:
+    # Sanitizar data: Extraer el primer elemento si los valores llegan como listas
+    sanitized_data = {}
+    raw_data = data.dict() if hasattr(data, 'dict') else data
+    
+    for key, value in raw_data.items():
+        if isinstance(value, list) and len(value) > 0:
+            sanitized_data[key] = value[0]
+        else:
+            sanitized_data[key] = value
+
+    # Remover campos protegidos
+    sanitized_data.pop('id', None)
+    sanitized_data.pop('sku', None)
+    
+    category_id = sanitized_data.pop('category_id', None)
+    brand_id = sanitized_data.pop('brand_id', None)
+    
+    # Casteo seguro
+    if category_id is not None:
+        if str(category_id).isdigit():
+            product.category_id = int(category_id)
+        else:
+            product.category_id = None
+            
+    if brand_id is not None:
+        if str(brand_id).isdigit():
+            product.brand_id = int(brand_id)
+        else:
+            product.brand_id = None
+
+    # Actualizar campos directamente
+    for field, value in sanitized_data.items():
+        # Evitar sobreescribir con blancos valores que no deben (por ej. imagen si no se envía)
+        # Solo actualizamos el campo de image si explicitly viene en el data y es un file/str
+        if field == 'image' and not value:
+            continue
+        if hasattr(product, field):
+            setattr(product, field, value)
+            
+    product.save()
+    
+    # Recalcular SKU basado en las mismas reglas (por si cambió marca, categoría o título)
+    category = Category.objects.filter(id=product.category_id).first() if product.category_id else None
+    brand = Brand.objects.filter(id=product.brand_id).first() if product.brand_id else None
+    sku_generado = _generate_sku(category, brand, product.title, product.id)
+    
+    if product.sku != sku_generado:
+        if not Product.objects.filter(sku=sku_generado).exclude(id=product.id).exists():
+            product.sku = sku_generado
+            product.save(update_fields=['sku'])
+            
+    return product
 
 def product_soft_delete(*, product: Product):
+
     product.is_deleted = True
     product.save(update_fields=['is_deleted'])
 
@@ -113,7 +204,10 @@ def process_product_scan(*, barcode: str, channel_uuid: str):
     Equivalente a App\\Events\\ProductScanned.
     Utiliza Django Channels para emitir al canal: scan_{channel_uuid}
     """
-    product = Product.objects.filter(sku=barcode, is_deleted=False).first()
+    from django.db.models import Q
+    product = Product.objects.filter(Q(sku=barcode) | Q(barcode=barcode), is_deleted=False).first()
+    
+    is_new = product is None
     
     # Emitir via Websockets (Django Channels)
     channel_layer = get_channel_layer()
@@ -127,7 +221,8 @@ def process_product_scan(*, barcode: str, channel_uuid: str):
             {
                 "type": "product.scanned", # El handler en tu consumer
                 "barcode": barcode,
-                "productData": product_data
+                "productData": product_data,
+                "is_new": is_new
             }
         )
     return product

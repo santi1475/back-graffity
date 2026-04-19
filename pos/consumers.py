@@ -27,5 +27,6 @@ class ScanConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'event': 'product.scanned',
             'barcode': event['barcode'],
-            'productData': event['productData']
+            'productData': event['productData'],
+            'is_new': event.get('is_new', False)
         }))
